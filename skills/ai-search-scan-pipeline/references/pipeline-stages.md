@@ -1,148 +1,111 @@
-# Pipeline stages (`src/lib/scan.ts`)
+# Website scan stages (`src/lib/scan.ts`)
 
-All AI calls run through `structured()`: Anthropic Messages API +
-`zodOutputFormat`, `max_tokens: 16000`, server-side-fallback beta
-(`fallbacks: "default"`), 180s timeout, `refusal` stop-reason check. Stage
-models are env-overridable (`SCAN_MODEL_QUERIES`, `SCAN_MODEL_COMPOSE`,
-default `claude-opus-5`). Lite mode composes with the cheaper queries model.
+Structured AI calls use the shared `structured()` helper: Anthropic Messages
+API, zod output format, a refusal check, and an explicit timeout. The scan
+uses `SCAN_MODEL_QUERIES` and `SCAN_MODEL_COMPOSE`; lite mode uses the less
+expensive model for composition.
 
-## Stage 1 — Crawl, or web-search fallback (5%)
+## Stage 1 — Crawl or research fallback (5%)
 
-`crawl(url)`. On failure, `researchBusiness()` asks Claude (web search,
-≤5 searches) to research the business behind the domain (what they do,
-category, location, services, sources). The composer is told explicitly
-that the site refused bot *and* browser — score on-site factors
-conservatively as **unverifiable**, state the block openly, and make
-unblocking reputable AI crawlers the **#1 priority fix**. The scan still
-completes.
+Run `crawl(url)`. If the site cannot be crawled, use web search to research
+the business behind the domain. Tell the report composer that on-site
+signals are unverifiable, state the crawl limitation plainly, and recommend
+unblocking reputable AI crawlers when the site appears to reject them. The
+scan should still complete when the fallback research succeeds.
 
 ## Stage 2 — Profile the business (15%)
 
-One structured call, effort `low` → `ProfileSchema`:
-`business_name, category, location, services[], buying_queries[8]`.
-Rule: buying queries must be what a real consumer asks **when ready to
-buy**, including location when the business is local.
+Build a profile with the business name, category, location, services, and
+buying questions. Questions should sound like what a real consumer asks
+when ready to buy, including a location for a local business.
 
-## Stage 3 — Real-demand grounding (22%) — `src/lib/demand.ts`
+## Stage 3 — Ground questions in real demand (22%)
 
-- Build ≤18 seed queries from the profile: for each of the first 5
-  services — `best {service}`, `{service} near me`, `{service} {city}`,
-  `best {service} in {city}`, `how much does {service} cost`,
-  `who does {service}` — plus `best {category}`, `{category} {city}`.
-  (Drop city when location is unknown.)
-- Query `suggestqueries.google.com/complete/search?client=chrome&q=…`
-  (public Autocomplete endpoint), 6s timeout, 6 concurrent per batch.
-- Rationale: autocomplete suggestions only exist because real people typed
-  them — this grounds every tested query in live demand rather than
-  invented phrasing.
-- Dedupe case-insensitively, cap **120 phrases**, keep seed provenance.
+Build seed phrases from the business's services and category. Include
+phrasing such as “best {service}”, “{service} near me”, “{service} {city}”,
+“how much does {service} cost”, and “who does {service}”. Omit location
+when unknown.
 
-## Stage 4 — Query plan (one structured call)
+Query Google Autocomplete with a six-second timeout and limit concurrency.
+Deduplicate phrases case-insensitively, cap the result set at 120 phrases,
+and preserve which real search phrase supports each question.
 
-Selects the **8 buying-intent questions** to actually test, from the real
-phrases + profile:
-- Prefer real-phrase-grounded queries, phrased naturally, with location
-  when local.
-- `backed_by` must **quote the exact real phrase(s)**, e.g.
-  `Real searches: 'best plumber annapolis', 'plumber near me annapolis'`.
-- At most **2 inferred** queries (only if real phrases don't cover an
-  important service), labeled honestly: `"Inferred from your services (no
-  search data found)"`.
-- No demand data reachable at all → fall back to the profiler's 8
-  `buying_queries`, all labeled inferred.
-- **Lite tier: first 4 queries only.**
+## Stage 4 — Select the test questions
 
-## Stage 5 — Ask the AI assistants (30→65%)
+Select eight buying-intent questions from the real search phrases and
+business profile:
 
-Run each planned query **concurrently, 4 at a time**.
+- Prefer natural questions grounded in real phrases, with a location when
+  applicable.
+- Quote the exact supporting search phrase(s) for each question.
+- Use at most two inferred questions when demand phrases do not cover an
+  important service, and label them as inferred.
+- If demand data is unavailable, use the profile's questions and identify
+  them as inferred.
+- Lite mode tests the first four questions only.
 
-**a) Claude with live web search** (`runVisibilityQuery`):
-> A consumer asks an AI assistant: "{query}" — answer exactly as a helpful
-> AI assistant would: recommend specific, named businesses (use web search
-> for real current options). Under 200 words.
+## Stage 5 — Ask AI assistants (30–65%)
 
-`web_search_20260209`, `max_uses: 3`, `max_tokens: 4000`, effort `low`.
-Handles `pause_turn` by resubmitting, up to 4 turns.
+Run the planned questions concurrently, up to four at a time. Ask each
+assistant to answer as it would to a consumer seeking current business
+recommendations, using web search when available. Keep each answer concise.
 
-**b) OpenRouter assistants** (skipped in lite, skipped if
-`OPENROUTER_API_KEY` unset): same consumer prompt to each configured model
-(`OPENROUTER_MODELS=model|Label,…`, default
-`openai/gpt-4o:online|ChatGPT (GPT-4o)`). 120s timeout, `max_tokens: 1200`,
-failures logged + skipped. `:free` models have no web search — label these
-as testing **brand recognition**, not live AI search.
+Claude uses the configured web-search tool. Handle multi-turn search
+responses where required. Optional OpenRouter assistants use
+`OPENROUTER_MODELS`; skip them in lite mode or when no key is configured.
+Log and skip individual assistant failures rather than failing the whole
+scan. Clearly distinguish models without web search: they measure brand
+recognition, not live AI-search visibility.
 
-Result shape per query: `answers: [{ assistant, answer }]`. This is the
-core measurement of the whole product: does an AI assistant answering a
-real buying question with live web search recommend this business, or a
-competitor?
+For every question, retain each assistant's name and answer. This is the
+core scan evidence: whether an assistant recommended the business or named
+competitors instead.
 
-## Stage 6 — Web presence sweep (70%) — skipped in lite
+## Stage 6 — Web presence sweep (70%; skipped in lite mode)
 
-`runPresenceSweep`: Claude + web search (`max_uses: 8`) reports on:
-1. Review platforms (Google/Yelp/Trustpilot/G2/industry equivalent) —
-   ratings/counts if visible.
-2. Reddit & Quora organic mentions.
-3. Other third-party citations.
+When enabled, use web search to check scan-relevant third-party evidence:
 
-Rule: report only what's actually found, **with sources**; state absence
-explicitly — **absence is itself a finding**. Lite tier substitutes a note
-telling the composer to score presence factors conservatively from crawl
-signals only, and mark the check indirect.
+1. Review platforms and visible ratings or review counts.
+2. Organic Reddit and Quora mentions.
+3. Other third-party citations relevant to the business.
 
-## Stage 7 — Agent readiness (parallel to everything else)
+Report only findings that are actually observed and cite their sources.
+State explicitly when a check finds no evidence. If the sweep is skipped or
+fails, qualify presence-related scores as indirect or unverifiable.
 
-`fetchAgenticReport()` (`src/lib/agentic.ts`) hits the free is-agentic.com
-API — "how well does the site work when an AI agent tries to use it":
-- `GET /api/v1/report?url=…` (10s timeout) for a stored report.
-- If none: trigger a scan via SSE (`GET /api/scan/stream?target=…`,
-  `Accept: text/event-stream`, 120s timeout), drain until close, re-fetch.
-- Extracts `score`, `score_label`, `report_url`, top 4 `issues`
-  (`name` + `recommendation`).
-- **Best-effort**: any failure → `null`, section omitted. Never blocks the
-  main report.
+## Stage 7 — Agent readiness (best effort)
 
-## Stage 8 — Compose the report (85%)
+Optionally retrieve or trigger a scan from is-agentic.com. Record its score,
+label, report URL, and up to four reported issues with recommendations.
+This check is best-effort: on any failure, omit the unavailable details and
+continue the main scan.
 
-One structured call, effort **high** → `ReportSchema`. Inputs: profile
-JSON, technical crawl summary (or the blocked-crawl verdict), every
-assistant answer per query (labeled `[Assistant]`), presence findings.
+## Stage 8 — Compose scan results (85%)
 
-Composer rules:
-- **Score honestly from evidence** — never inflate or invent. Missing
-  evidence (e.g. backlinks) → score conservatively, say the check was
-  indirect.
-- **Never use an em dash** anywhere in output text.
-- `headline`: one direct second-person sentence, the core finding.
-- `visibility[]`: one entry per query; `mentioned=true` only if *this
-  exact business* was recommended; per-assistant `mentioned` reflects only
-  that assistant's own answer; `query`/`backed_by` copied verbatim;
-  `recommended_instead` lists competitor names.
-- `factors[]`: all nine (see `scoring-factors.md`) — `score` (0-100), one
-  sentence of concrete evidence from the actual inputs, one specific fix,
-  and a standalone `fix_prompt` a user can paste into Claude Code — must
-  name their real domain, cite concrete problems found (real headings,
-  missing schema types, actual issues), describe the end state, need zero
-  other context. Non-code fixes → an action plan or draft content instead.
-- `priority_fixes`: top 3 changes to move AI visibility in 60-90 days.
+Compose the report from the business profile, crawl summary (or fallback
+research), real demand phrases, every assistant answer, and any available
+presence or agent-readiness evidence.
 
-**Deterministic post-processing (not AI):**
-- Re-attach `backed_by` from the query plan by lowercase query match (in
-  case the composer paraphrased it).
-- Merge in `agent_readiness` (omit if null).
-- Scan row → `status: done`, `progress: 100`.
+Report rules:
 
-## Stage 9 — Delivery
+- Score honestly from evidence. Missing evidence means a conservative score
+  and a clear note that the check was indirect or unverifiable.
+- Never use an em dash in generated report text.
+- State the main finding directly and address the reader as “you”.
+- For each buying question, say whether the business was recommended by any
+  assistant, list assistant-level outcomes, and name competitors only when
+  they actually appeared in an answer.
+- Include all nine scoring factors. Each needs a score from 0 to 100,
+  concrete evidence, a specific fix, and a standalone `fix_prompt` that can
+  be used without additional context. For a non-code fix, provide an action
+  plan or draft content instead.
+- End with the three highest-impact priorities for improving visibility
+  over the next 60–90 days.
 
-- **Report email** (Resend, `src/lib/email.ts`): score, headline,
-  "missing from N of M buying questions", link to `/r/[id]`, booking CTA.
-  All interpolated strings HTML-escaped. No-op without `RESEND_API_KEY`.
-- **Lead notification** + **CRM sync** (`src/lib/crm.ts`): upsert into a
-  separate CRM Supabase (company by domain + contact + note linking the
-  report), deduped per scan, failures never block.
-- **Newsletter** (`src/lib/newsletter.ts`): beehiiv, only when fully
-  configured and disclosed at the email step; never reactivate unsubscribes.
-- **Daily follow-up** (`/api/cron/followup`, Vercel Cron 15:00 UTC, Bearer
-  `CRON_SECRET`): one nudge to leads 24-96h post-scan who haven't booked.
+## Stage 9 — Return the result in chat
 
-**Error path**: any failure marks the scan `error` with the message, but
-the lead notification still fires — contact info was already captured.
+Return the completed scan directly as a plain-text chat message. Use simple
+headings and bullets for readability, not JSON or HTML. Include the score,
+key visibility findings, factor scores with evidence and fixes, and the top
+priorities. If a scan stage failed, say what could not be verified and
+continue with the evidence that remains.
