@@ -1,0 +1,22 @@
+{
+  "name": "ai-search-helpers",
+  "displayName": "AI Search Helpers",
+  "version": "1.0.0",
+  "description": "Scan a business website for AI-search visibility: crawl the site, test real customer buying questions against AI assistants, score the evidence, and return a plain-text chat report.",
+  "author": {
+    "name": "HavaianasDestruido",
+    "url": "https://github.com/havaianasdestruido"
+  },
+  "homepage": "https://aisearchhelpers.com",
+  "repository": "https://github.com/havaianasdestruido/seohelper",
+  "license": "MIT",
+  "keywords": [
+    "seo",
+    "ai-search",
+    "aeo",
+    "geo",
+    "llm-visibility",
+    "website-scan",
+    "crawler"
+  ]
+}

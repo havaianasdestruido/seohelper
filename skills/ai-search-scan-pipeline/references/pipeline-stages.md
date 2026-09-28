@@ -84,28 +84,15 @@ continue the main scan.
 
 Compose the report from the business profile, crawl summary (or fallback
 research), real demand phrases, every assistant answer, and any available
-presence or agent-readiness evidence.
+presence or agent-readiness evidence. Score the nine factors with
+`references/scoring-factors.md`.
 
-Report rules:
-
-- Score honestly from evidence. Missing evidence means a conservative score
-  and a clear note that the check was indirect or unverifiable.
-- Never use an em dash in generated report text.
-- State the main finding directly and address the reader as “you”.
-- For each buying question, say whether the business was recommended by any
-  assistant, list assistant-level outcomes, and name competitors only when
-  they actually appeared in an answer.
-- Include all nine scoring factors. Each needs a score from 0 to 100,
-  concrete evidence, a specific fix, and a standalone `fix_prompt` that can
-  be used without additional context. For a non-code fix, provide an action
-  plan or draft content instead.
-- End with the three highest-impact priorities for improving visibility
-  over the next 60–90 days.
+The layout, section order, and writing rules live in
+`references/report-format.md`. Do not restate them here; compose to that file
+so the report format has a single owner.
 
 ## Stage 9 — Return the result in chat
 
-Return the completed scan directly as a plain-text chat message. Use simple
-headings and bullets for readability, not JSON or HTML. Include the score,
-key visibility findings, factor scores with evidence and fixes, and the top
-priorities. If a scan stage failed, say what could not be verified and
-continue with the evidence that remains.
+Return the completed scan directly as a plain-text chat message in the
+`references/report-format.md` shape. If a scan stage failed, say what could
+not be verified and continue with the evidence that remains.
