@@ -1,43 +1,34 @@
-# Models, config, infra
+# Scan models and runtime
 
 ## Models
-- Anthropic Messages API (`@anthropic-ai/sdk`), zod structured outputs.
-- `SCAN_MODEL_QUERIES` / `SCAN_MODEL_COMPOSE` (default `claude-opus-5` for
-  both). Queries stage makes 8+ web-search calls — low rate-limit tiers may
-  want `SCAN_MODEL_QUERIES=claude-sonnet-5`.
-- Web search tool: `web_search_20260209` — 3 uses per visibility query, 8
-  for the presence sweep.
-- OpenRouter optional: `OPENROUTER_API_KEY`, `OPENROUTER_MODELS=model|Label,…`.
 
-## Store
-- Supabase when `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`
-  set; else zero-config in-memory store for local dev (lost on restart).
-- `POST /api/dev/seed` creates a sample report in dev.
+- Anthropic Messages API (`@anthropic-ai/sdk`) with structured outputs.
+- `SCAN_MODEL_QUERIES` and `SCAN_MODEL_COMPOSE` select the query and report
+  models (both default to `claude-opus-5`). The query stage makes multiple
+  web-search calls; lower rate-limit tiers may prefer a faster model.
+- Web search tool: `web_search_20260209`.
+- Optional OpenRouter assistants are configured with
+  `OPENROUTER_API_KEY` and `OPENROUTER_MODELS=model|Label,…`.
 
-## Execution
-- `after()` on the API route, `maxDuration: 300`; progress written to the
-  scan row and polled by the client.
+## Scan execution
 
-## Delivery
-- Resend (report email + operator notification).
-- Optional CRM Supabase sync.
-- Optional beehiiv newsletter.
-- Vercel Cron follow-up (`/api/cron/followup`, 15:00 UTC, Bearer `CRON_SECRET`).
+The scan may report progress while it works. Compose its final result as a
+plain-text response directly in chat.
 
-## White-label
-All customer-facing surfaces read `NEXT_PUBLIC_BRAND_*` env vars (name,
-domain, accent, tagline, booking URL). Don't hardcode brand strings.
+## Outbound-call timeouts
 
-## Timeout discipline — every outbound call needs an explicit `AbortSignal.timeout`
+Every outbound request must have an explicit `AbortSignal.timeout` so a slow
+service cannot hold up the scan indefinitely.
 
 | Call | Timeout |
-|---|---|
+|---|---:|
 | Google Autocomplete | 6s |
 | Sitemap fetch | 8s |
-| is-agentic.com report fetch | 10s |
-| Crawl fetches (homepage/hops) | 15s |
-| OpenRouter / is-agentic SSE scan | 120s |
+| Agent-readiness report fetch | 10s |
+| Website crawl fetches and redirect hops | 15s |
+| OpenRouter / agent-readiness stream | 120s |
 | Anthropic structured calls | 180s |
 
-Plus SDK-level retries. A new outbound call without a timeout can hang an
-entire scan — never add one without setting this.
+Keep timeout and failure handling appropriate for the scan stage. Optional
+research stages should fail gracefully; they must not prevent a report from
+being returned when the essential scan evidence is available.
