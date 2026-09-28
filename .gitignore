@@ -1,0 +1,18 @@
+# Local Claude Code settings, kept out of the repo
+.claude/settings.local.json
+
+# Skills CLI install artifacts, only present when testing installs locally
+skills-lock.json
+.agents/
+
+# Dependencies and logs
+node_modules/
+*.log
+
+# Secrets
+.env
+.env.*
+
+# OS noise
+.DS_Store
+Thumbs.db

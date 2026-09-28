@@ -1,4 +1,4 @@
-# Scan scoring and plain-text chat report
+# Scan scoring and factor definitions
 
 Score each factor from 0 to 100 using only evidence available in the scan.
 For missing or indirect evidence, score conservatively and say it could not
@@ -44,33 +44,5 @@ code change is not appropriate, give an actionable plan or draft content.
   structured data. Surface it as a structure issue when supported by the
   crawl evidence.
 
-## Plain-text chat response format
-
-Return the finished results directly in the chat. Keep them readable and
-scannable, using plain text rather than JSON or HTML.
-
-Use this outline, omitting optional sections when no evidence is available:
-
-AI SEARCH SCAN: {business name} ({domain})
-Overall score: {score}/100
-{One-sentence headline}
-
-AI visibility
-- “{buying question}”: {recommended / not recommended}; {assistant-level outcome and actual alternatives}
-- Include the evidence phrase that grounded each question, or mark the question inferred.
-
-Factor scores
-- {Factor name}: {score}/100. Evidence: {observed evidence or what could not be verified}. Fix: {specific action}.
-  Fix prompt: {standalone prompt or action plan}
-- Repeat for all nine factors.
-
-Priority fixes
-1. {Highest-impact action}
-2. {Next action}
-3. {Third action}
-
-Summary
-{Short plain-language conclusion grounded in the scan. Add optional agent-readiness findings if available.}
-
-Use simple headings and bullets. Do not invent data to fill an empty section;
-state what the scan could not verify and why.
+Compose the scored result with `references/report-format.md`; that file owns
+the plain-text layout, the section order, and the writing rules.

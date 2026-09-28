@@ -1,0 +1,22 @@
+{
+  "name": "seohelper",
+  "description": "Skills and plugins for AI-search visibility work, starting with the AI Search Helpers website scan.",
+  "owner": {
+    "name": "HavaianasDestruido",
+    "url": "https://github.com/havaianasdestruido"
+  },
+  "plugins": [
+    {
+      "name": "ai-search-helpers",
+      "source": "./",
+      "description": "Scan a business website for AI-search visibility: crawl the site, test real customer buying questions against AI assistants, score the evidence, and return a plain-text chat report.",
+      "category": "seo",
+      "keywords": [
+        "seo",
+        "ai-search",
+        "website-scan",
+        "llm-visibility"
+      ]
+    }
+  ]
+}

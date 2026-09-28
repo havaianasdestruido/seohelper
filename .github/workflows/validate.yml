@@ -1,0 +1,37 @@
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  repo-checks:
+    name: repo checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Validate manifests, skills, and style
+        run: node scripts/validate.mjs
+
+  plugin-manifests:
+    name: plugin manifests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Validate the marketplace and plugin manifests
+        run: npx -y @anthropic-ai/claude-code@latest plugin validate . --strict
+
+      - name: Confirm the skill is discoverable by the skills CLI
+        run: npx -y skills@latest add ./ --list

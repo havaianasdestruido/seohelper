@@ -6,9 +6,13 @@ description: >
   evidence-based findings, and return the finished results as a plain-text
   chat message. Use this skill for scan-pipeline, crawler, query, scoring,
   model, and report-output tasks.
+license: MIT
+metadata:
+  version: "1.0.0"
+  homepage: https://aisearchhelpers.com
 ---
 
-# AI Search Helpers — Website Scan
+# AI Search Helpers: Website Scan
 
 ## Purpose
 
@@ -24,9 +28,11 @@ Load the relevant reference only when needed:
 | Task | Reference |
 |---|---|
 | Fetching/parsing the target site, redirects, SSRF, bot-vs-browser behavior | `references/crawler.md` |
-| Scan stages, query research, AI visibility checks, and report composition | `references/pipeline-stages.md` |
-| Scoring evidence, verdicts, and the chat report format | `references/scoring-factors.md` |
+| Scan stages, query research, and AI visibility checks | `references/pipeline-stages.md` |
+| Scoring evidence, verdicts, and the nine factor definitions | `references/scoring-factors.md` |
+| Plain-text chat report layout and composition rules | `references/report-format.md` |
 | Models, runtime, and outbound-call timeouts | `references/config-and-infra.md` |
+| A filled-in example of the finished report | `examples/sample-scan-output.md` |
 
 ## Scan flow
 
@@ -82,4 +88,4 @@ If progress is shown, keep these stages in order:
 - **Debug a slow or failed scan:** check `references/config-and-infra.md`;
   every outbound request needs an explicit timeout.
 - **Change the final answer:** update the plain-text template in
-  `references/scoring-factors.md` and keep the output evidence-based.
+  `references/report-format.md` and keep the output evidence-based.
